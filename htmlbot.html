@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Human Vs Ai</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #000000;
+        text-align: center;
+        margin-top: 20px;
+    }
+    h1 {
+        font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        color: #f9d423;
+    }
+    #chessboard {
+        display: grid;
+        grid-template-columns: repeat(8, 60px);
+        grid-template-rows: repeat(8, 60px);
+        margin: 0 auto;
+        border: 3px solid gold;
+        width: 485px;
+    }
+    .square {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        cursor: pointer;
+        user-select: none;
+    }
+    .white {
+        background-color: rgb(211, 210, 210);
+    }
+    .black {
+        background-color: gray;
+    }
+    .selected {
+        outline: 3px solid red;
+    }
+    #status {
+        margin-top: 10px;
+        font-weight: bold;
+        min-height: 1.5em;
+        color: white;
+    }
+    #controls {
+        margin-top: 15px;
+    }
+    button {
+        font-size: 20px;
+        margin: 0 10px;
+        cursor: pointer;
+        padding: 5px 10px;
+    }
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        padding: 20px 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 18px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    .promo-piece-btn {
+        font-size: 48px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    .promo-piece-btn:hover {
+        transform: scale(1.3);
+    }
+    #checkmateModal .modal-content,
+    #drawModal .modal-content {
+        flex-direction: column;
+        font-size: 36px;
+        color: black;
+        font-weight: 900;
+        border: 5px solid #000000;
+    }
+    #checkmateModal button,
+    #drawModal button {
+        font-size: 24px;
+        margin-top: 20px;
+        padding: 10px 20px;
+        cursor: pointer;
+        background:#1d3557;
+        color: white;
+        border:none;
+        border-radius:8px;
+    }
+    #openingDisplay {
+        color: #f9d423;
+        font-size: 18px;
+        margin-bottom: 10px;
+        min-height: 1.5em;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<h1>Human Vs Ai</h1>
+<div id="openingDisplay"></div>
+<div id="chessboard"></div>
+<p id="status"></p>
+<div id="controls">
+    <a href="homescreen.html"><button type="button" class="btn btn-dark">Back To Homescreen</button></a>
+    <button id="undoBtn" title="Undo Move" type="button" class="btn btn-dark">↩️ Undo</button>
+    <button id="redoBtn" title="Redo Move" type="button" class="btn btn-dark">↪️ Redo</button>
+</div>
+
+<div id="promotionModal" class="modal">
+    <div class="modal-content" id="promotionOptions">
+        <button class="promo-piece-btn" data-piece="Q">♕</button>
+        <button class="promo-piece-btn" data-piece="R">♖</button>
+        <button class="promo-piece-btn" data-piece="B">♗</button>
+        <button class="promo-piece-btn" data-piece="N">♘</button>
+    </div>
+</div>
+
+<div id="checkmateModal" class="modal">
+    <div class="modal-content">
+        <p id="checkmateMessage"></p>
+        <button id="playAgainBtnCheckmate">Play Again</button>
+    </div>
+</div>
+
+<div id="drawModal" class="modal">
+    <div class="modal-content">
+        <p id="drawMessage"></p>
+        <button id="playAgainBtnDraw">Play Again</button>
+    </div>
+</div>
+
+<script>
+    const board = document.getElementById("chessboard");
+    const status = document.getElementById("status");
+    const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
+    const openingDisplay = document.getElementById("openingDisplay");
+
+    const promotionModal = document.getElementById("promotionModal");
+    const promotionOptions = document.getElementById("promotionOptions");
+
+    const checkmateModal = document.getElementById("checkmateModal");
+    const checkmateMessage = document.getElementById("checkmateMessage");
+    const playAgainBtnCheckmate = document.getElementById("playAgainBtnCheckmate");
+
+    const drawModal = document.getElementById("drawModal");
+    const drawMessage = document.getElementById("drawMessage");
+    const playAgainBtnDraw = document.getElementById("playAgainBtnDraw");
+    let selectedSquare = null;
+    let currentTurn = "white";
+    let gameOver = false;
+    let pendingPromotion = null;
+    let lastAIMove = null;
+    const openings = {
+        "Italian Game": [
+            ["e2", "e4"], ["e7", "e5"],
+            ["g1", "f3"], ["b8", "c6"],
+            ["f1", "c4"]
+        ],
+        "Sicilian Defense": [
+            ["e2", "e4"], ["c7", "c5"]
+        ],
+        "French Defense": [
+            ["e2", "e4"], ["e7", "e6"]
+        ],
+        "Ruy Lopez": [
+            ["e2", "e4"], ["e7", "e5"],
+            ["g1", "f3"], ["b8", "c6"],
+            ["f1", "b5"]
+        ],
+        "Caro-Kann Defense": [
+            ["e2", "e4"], ["c7", "c6"]
+        ],
+        "Scandinavian Defense": [
+            ["e2", "e4"], ["d7", "d5"]
+        ],
+        "Pirc Defense": [
+            ["e2", "e4"], ["d7", "d6"]
+        ],
+        "Alekhine's Defense": [
+            ["e2", "e4"], ["g8", "f6"]
+        ],
+        "Queen's Gambit": [
+            ["d2", "d4"], ["d7", "d5"],
+            ["c2", "c4"]
+        ],
+        "King's Gambit": [
+            ["e2", "e4"], ["e7", "e5"],
+            ["f2", "f4"]
+        ]
+    };
+    let currentOpening = null;
+    let openingMoves = [];
+    let openingMoveIndex = 0;
+    const pieces = {
+        white: { K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙" },
+        black: { K: "♚", Q: "♛", R: "♜", B: "♝", N: "♞", P: "♟" },
+    };
+    let boardState = [];
+    let castlingRights = {
+        white: { K: true, Q: true },
+        black: { K: true, Q: true }
+    };
+    let enPassantTarget = null;
+    let moveCountSinceLastCaptureOrPawnMove = 0;
+    let positionHistory = [];
+    let undoStack = [];
+    let redoStack = [];
+    const pieceValues = { P: 10, N: 30, B: 30, R: 50, Q: 90, K: 900 };
+    const AI_DEPTH = 3;
+    class GameState {
+        constructor(board, castlingRights, enPassantTarget, moveCountSinceLastCaptureOrPawnMove) {
+            this.board = cloneBoard(board);
+            this.castlingRights = JSON.parse(JSON.stringify(castlingRights));
+            this.enPassantTarget = enPassantTarget ? { ...enPassantTarget } : null;
+            this.moveCountSinceLastCaptureOrPawnMove = moveCountSinceLastCaptureOrPawnMove;
+        }
+
+        clone() {
+            return new GameState(this.board, this.castlingRights, this.enPassantTarget, this.moveCountSinceLastCaptureOrPawnMove);
+        }
+    }
+    function cloneBoard(board) {
+        return board.map(row => row.map(piece => piece ? { ...piece } : null));
+    }
+    function convertNotationToIndices(notation) {
+        const col = notation.charCodeAt(0) - 'a'.charCodeAt(0);
+        const row = 8 - parseInt(notation[1]);
+        return { r: row, c: col };
+    }
+    function convertIndicesToNotation(r, c) {
+        const colChar = String.fromCharCode('a'.charCodeAt(0) + c);
+        const rowNum = 8 - r;
+        return `${colChar}${rowNum}`;
+    }
+    function capitalize(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    function oppositeColor(color) {
+        return color === "white" ? "black" : "white";
+    }
+
+    function updateUndoRedoButtons() {
+        undoBtn.disabled = undoStack.length === 0;
+        redoBtn.disabled = redoStack.length === 0;
+    }
+    function renderBoard() {
+        board.innerHTML = "";
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const sq = document.createElement("div");
+                sq.classList.add("square");
+                sq.classList.add((r + c) % 2 === 0 ? "white" : "black");
+                const piece = boardState[r][c];
+                if (piece) sq.textContent = pieces[piece.color][piece.type];
+                sq.dataset.row = r;
+                sq.dataset.col = c;
+                sq.addEventListener("click", onSquareClick);
+                board.appendChild(sq);
+            }
+        }
+        if (!gameOver && !pendingPromotion) {
+            status.textContent = `Turn: ${capitalize(currentTurn)}`;
+        }
+    }
+    function findKing(color, board = boardState) {
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (p && p.type === "K" && p.color === color) return { r, c };
+            }
+        }
+        return null;
+    }
+
+    function isSquareAttacked(r, c, byColor, board = boardState) {
+        for (let rr = 0; rr < 8; rr++) {
+            for (let cc = 0; cc < 8; cc++) {
+                const p = board[rr][cc];
+                if (p && p.color === byColor) {
+                    if (isLegalMoveForPiece(rr, cc, r, c, p.type, p.color, board)) return true;
+                }
+            }
+        }
+        return false;
+    }
+    function isInCheck(color, board = boardState) {
+        const kingPos = findKing(color, board);
+        if (!kingPos) return false;
+        const opponent = oppositeColor(color);
+        return isSquareAttacked(kingPos.r, kingPos.c, opponent, board);
+    }
+    function isLegalMoveForPiece(fr, fc, tr, tc, pieceType, pieceColor, board = boardState, currentEnPassantTarget = enPassantTarget) {
+        const target = board[tr][tc];
+        if (target && target.color === pieceColor) return false;
+
+        const dr = tr - fr;
+        const dc = tc - fc;
+
+        switch (pieceType) {
+            case "P": return isLegalPawnMove(pieceColor, fr, fc, tr, tc, board, currentEnPassantTarget);
+            case "R":
+                return (dr === 0 || dc === 0) && isPathClear(fr, fc, tr, tc, board);
+            case "N":
+                return (Math.abs(dr) === 2 && Math.abs(dc) === 1) || (Math.abs(dr) === 1 && Math.abs(dc) === 2);
+            case "B":
+                return (Math.abs(dr) === Math.abs(dc)) && isPathClear(fr, fc, tr, tc, board);
+            case "Q":
+                return ((dr === 0 || dc === 0) || (Math.abs(dr) === Math.abs(dc))) &&
+                       isPathClear(fr, fc, tr, tc, board);
+            case "K":
+                return (Math.abs(dr) <= 1 && Math.abs(dc) <= 1);
+        }
+        return false;
+    }
+    function isLegalPawnMove(color, fr, fc, tr, tc, board = boardState, currentEnPassantTarget = enPassantTarget) {
+        const direction = color === "white" ? -1 : 1;
+        const startRow = color === "white" ? 6 : 1;
+        const target = board[tr][tc];
+
+        if (fc === tc) {
+            if (tr === fr + direction && !target) return true;
+            if (fr === startRow && tr === fr + 2 * direction && !target && !board[fr + direction][fc]) {
+                return true;
+            }
+            return false;
+        }
+        if (Math.abs(tc - fc) === 1 && tr === fr + direction) {
+            if (target && target.color !== color) return true;
+            if (!target && currentEnPassantTarget && tr === currentEnPassantTarget.row && tc === currentEnPassantTarget.col) {
+                const capturedPawn = board[fr][tc];
+                if (capturedPawn && capturedPawn.type === "P" && capturedPawn.color !== color) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    function isPathClear(fr, fc, tr, tc, board = boardState) {
+        const dr = Math.sign(tr - fr);
+        const dc = Math.sign(tc - fc);
+        let r = fr + dr;
+        let c = fc + dc;
+        while (r !== tr || c !== tc) {
+            if (board[r][c]) return false;
+            r += dr;
+            c += dc;
+        }
+        return true;
+    }
+    function canCastle(color, side, board = boardState, currentCastlingRights = castlingRights) {
+        if (!currentCastlingRights[color][side]) return false;
+        const r = color === "white" ? 7 : 0;
+
+        if (isInCheck(color, board)) return false;
+
+        let rookCol;
+        let pathCols;
+        let attackCheckCols;
+
+        if (side === "K") {
+            rookCol = 7;
+            pathCols = [5, 6];
+            attackCheckCols = [4, 5, 6];
+        } else if (side === "Q") {
+            rookCol = 0;
+            pathCols = [1, 2, 3];
+            attackCheckCols = [4, 3, 2];
+        } else {
+            return false;
+        }
+        const rook = board[r][rookCol];
+        if (!rook || rook.type !== "R" || rook.color !== color) return false;
+
+        // 3. Path between king and rook must be empty
+        for (let c of pathCols) {
+            if (board[r][c]) return false;
+        }
+
+        // 4. King must not pass through or land on a square that is attacked
+        const opponent = oppositeColor(color);
+        for (let c of attackCheckCols) {
+            if (isSquareAttacked(r, c, opponent, board)) return false;
+        }
+        return true;
+    }
+
+    // The main move validation function. Ensures the move is valid and doesn't leave king in check.
+    function isLegalMove(fr, fc, tr, tc, currentBoardState = boardState, currentCastlingRights = castlingRights, currentEnPassantTarget = enPassantTarget) {
+        const piece = currentBoardState[fr][fc];
+        if (!piece) return false;
+        const target = currentBoardState[tr][tc];
+        if (target && target.color === piece.color) return false; // Cannot capture own piece
+
+        // Handle Castling as a special move first
+        if (piece.type === "K" && Math.abs(tc - fc) === 2 && fr === tr) {
+            return canCastle(piece.color, tc > fc ? "K" : "Q", currentBoardState, currentCastlingRights);
+        }
+
+        // Basic move validation for the piece type
+        if (!isLegalMoveForPiece(fr, fc, tr, tc, piece.type, piece.color, currentBoardState, currentEnPassantTarget)) {
+            return false;
+        }
+
+        // Simulate the move on a temporary board to check for self-check
+        const tempBoard = cloneBoard(currentBoardState);
+        let tempEnPassantTarget = currentEnPassantTarget ? { ...currentEnPassantTarget } : null;
+        let tempCastlingRights = JSON.parse(JSON.stringify(currentCastlingRights));
+
+        const movedPiece = tempBoard[fr][fc];
+        const capturedPiece = tempBoard[tr][tc]; // For en passant check
+
+        // Apply the hypothetical move to the temporary board
+        tempBoard[tr][tc] = movedPiece;
+        tempBoard[fr][fc] = null;
+
+        // Handle En Passant capture on temp board (remove the captured pawn)
+        // This condition checks for a diagonal pawn move to an empty square, matching en passant target
+        if (movedPiece.type === "P" && Math.abs(tc - fc) === 1 && !capturedPiece && tempEnPassantTarget && tr === tempEnPassantTarget.row && tc === tempEnPassantTarget.col) {
+            tempBoard[fr][tc] = null; // Remove the captured pawn from its actual location
+        }
+
+        // Handle Castling Rook move on temp board (if king is castling)
+        if (movedPiece.type === "K" && Math.abs(tc - fc) === 2) {
+            if (tc === 6) { // Kingside
+                tempBoard[tr][5] = tempBoard[tr][7];
+                tempBoard[tr][7] = null;
+            } else if (tc === 2) { // Queenside
+                tempBoard[tr][3] = tempBoard[tr][0];
+                tempBoard[tr][0] = null;
+            }
+        }
+        
+        // Update castling rights for the temp board based on moved piece
+        if (movedPiece.type === "K") {
+            tempCastlingRights[movedPiece.color].K = false;
+            tempCastlingRights[movedPiece.color].Q = false;
+        } else if (movedPiece.type === "R") {
+            if (fr === 0 && fc === 0) tempCastlingRights.black.Q = false;
+            if (fr === 0 && fc === 7) tempCastlingRights.black.K = false;
+            if (fr === 7 && fc === 0) tempCastlingRights.white.Q = false;
+            if (fr === 7 && fc === 7) tempCastlingRights.white.K = false;
+        }
+
+        // Check if the king is in check on the *tempBoard* after the hypothetical move
+        if (isInCheck(piece.color, tempBoard)) {
+            return false; // The move is illegal because it leaves the king in check
+        }
+        return true; // The move is legal
+    }
+
+    // --- Game End Condition Checks ---
+
+    // Checks if the current player is in checkmate
+    function isCheckmate(color) {
+        if (!isInCheck(color)) return false; // Not checkmate if not in check
+
+        // Check all legal moves for the current player; if any exist, it's not checkmate
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = boardState[r][c];
+                if (p && p.color === color) {
+                    for (let tr = 0; tr < 8; tr++) {
+                        for (let tc = 0; tc < 8; tc++) {
+                            if (isLegalMove(r, c, tr, tc)) {
+                                return false; // Found a legal move to get out of check
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return true; // No legal moves found to escape check
+    }
+
+    // Checks if the current player is in stalemate
+    function isStalemate() {
+        if (isInCheck(currentTurn)) return false; // Not stalemate if in check
+
+        // Check if there are ANY legal moves for the current player
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = boardState[r][c];
+                if (p && p.color === currentTurn) {
+                    for (let tr = 0; tr < 8; tr++) {
+                        for (let tc = 0; tc < 8; tc++) {
+                            if (isLegalMove(r, c, tr, tc)) {
+                                return false; // Found a legal move, so not stalemate
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return true; // No legal moves found, and not in check = stalemate
+    }
+
+    // Checks for Threefold Repetition
+    function isThreefoldRepetition() {
+        const currentPosition = JSON.stringify(boardState) + currentTurn + JSON.stringify(castlingRights) + (enPassantTarget ? JSON.stringify(enPassantTarget) : "");
+        let count = 0;
+        for (const position of positionHistory) {
+            if (position === currentPosition) {
+                count++;
+                if (count >= 3) return true;
+            }
+        }
+        return false;
+    }
+
+    // Checks for Insufficient Material (simplified)
+    function isInsufficientMaterial() {
+        let whitePieces = [];
+        let blackPieces = [];
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = boardState[r][c];
+                if (p) {
+                    if (p.color === "white") whitePieces.push({ type: p.type, r, c });
+                    else blackPieces.push({ type: p.type, r, c });
+                }
+            }
+        }
+
+        // King vs King
+        if (whitePieces.length === 1 && whitePieces[0].type === "K" &&
+            blackPieces.length === 1 && blackPieces[0].type === "K") return true;
+
+        // King and Knight vs King
+        if (whitePieces.length === 2 && whitePieces.some(p => p.type === "K") && whitePieces.some(p => p.type === "N") &&
+            blackPieces.length === 1 && blackPieces[0].type === "K") return true;
+        if (blackPieces.length === 2 && blackPieces.some(p => p.type === "K") && blackPieces.some(p => p.type === "N") &&
+            whitePieces.length === 1 && whitePieces[0].type === "K") return true;
+
+        // King and Bishop vs King
+        if (whitePieces.length === 2 && whitePieces.some(p => p.type === "K") && whitePieces.some(p => p.type === "B") &&
+            blackPieces.length === 1 && blackPieces[0].type === "K") return true;
+        if (blackPieces.length === 2 && blackPieces.some(p => p.type === "K") && blackPieces.some(p => p.type === "B") &&
+            whitePieces.length === 1 && whitePieces[0].type === "K") return true;
+
+        // King and Bishop vs King and Bishop (on same color squares)
+        if (whitePieces.length === 2 && whitePieces.some(p => p.type === "K") && whitePieces.some(p => p.type === "B") &&
+            blackPieces.length === 2 && blackPieces.some(p => p.type === "K") && blackPieces.some(p => p.type === "B")) {
+            const whiteBishop = whitePieces.find(p => p.type === "B");
+            const blackBishop = blackPieces.find(p => p.type === "B");
+            if (whiteBishop && blackBishop &&
+                ((whiteBishop.r + whiteBishop.c) % 2 === (blackBishop.r + blackBishop.c) % 2)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // --- Game End UI Functions ---
+    function showCheckmate(winnerColor) {
+        gameOver = true;
+        checkmateMessage.textContent = `Checkmate! ${capitalize(winnerColor)} wins!`;
+        checkmateModal.style.display = "flex";
+        status.textContent = ""; // Clear main status
+    }
+
+    function hideCheckmateModal() {
+        checkmateModal.style.display = "none";
+    }
+
+    function showDrawBanner(message) {
+        gameOver = true;
+        drawMessage.textContent = message;
+        drawModal.style.display = "flex";
+        status.textContent = ""; // Clear main status
+    }
+
+    function hideDrawModal() {
+        drawModal.style.display = "none";
+    }
+
+    // --- Main Game Logic ---
+
+    // Saves the current complete game state to the undo stack
+    function saveState() {
+        undoStack.push({
+            board: cloneBoard(boardState),
+            castlingRights: JSON.parse(JSON.stringify(castlingRights)),
+            enPassantTarget: enPassantTarget ? { ...enPassantTarget } : null,
+            moveCountSinceLastCaptureOrPawnMove: moveCountSinceLastCaptureOrPawnMove,
+            currentTurn: currentTurn, // Save current turn to restore correctly on undo
+            lastAIMove: lastAIMove ? { ...lastAIMove } : null // Save AI's last move for reversal
+        });
+        redoStack = []; // Clear redo stack on new move
+        updateUndoRedoButtons();
+        // Add current position string to history for threefold repetition
+        positionHistory.push(JSON.stringify(boardState) + currentTurn + JSON.stringify(castlingRights) + (enPassantTarget ? JSON.stringify(enPassantTarget) : ""));
+    }
+
+    // Centralized function to check all game-ending conditions after a move
+    function checkGameEndConditions() {
+        if (isStalemate()) {
+            showDrawBanner("Stalemate! Game drawn!");
+            return;
+        }
+        if (isThreefoldRepetition()) {
+            showDrawBanner("Threefold repetition! Game drawn!");
+            return;
+        }
+        if (moveCountSinceLastCaptureOrPawnMove >= 50) {
+            showDrawBanner("50-move rule! Game drawn!");
+            return;
+        }
+        if (isInsufficientMaterial()) {
+            showDrawBanner("Insufficient material! Game drawn!");
+            return;
+        }
+
+        if (isInCheck(currentTurn)) {
+            if (isCheckmate(currentTurn)) {
+                showCheckmate(oppositeColor(currentTurn));
+            } else {
+                status.textContent = `Check to ${capitalize(currentTurn)} king!`;
+            }
+        } else {
+            status.textContent = `Turn: ${capitalize(currentTurn)}`;
+        }
+    }
+
+    // --- Event Handlers ---
+
+    function onSquareClick(e) {
+        if (gameOver || pendingPromotion) return;
+        if (currentTurn === "black") { // Prevent human interaction during AI's turn
+            status.textContent = "It's the AI's turn!";
+            return;
+        }
+
+        const r = +e.target.dataset.row;
+        const c = +e.target.dataset.col;
+        const clickedPiece = boardState[r][c];
+
+        if (selectedSquare) {
+            // A piece is already selected, so this click is an attempt to move
+            const fromR = +selectedSquare.dataset.row;
+            const fromC = +selectedSquare.dataset.col;
+            const selectedPiece = boardState[fromR][fromC];
+
+            if (!selectedPiece || selectedPiece.color !== currentTurn) {
+                selectedSquare.classList.remove("selected");
+                selectedSquare = null;
+                return;
+            }
+
+            if (isLegalMove(fromR, fromC, r, c)) {
+                saveState(); // Save state BEFORE modifying the board
+
+                const pieceBeingMoved = boardState[fromR][fromC];
+                const targetPieceAtDestination = boardState[r][c]; // Piece at destination square
+                let isCapture = targetPieceAtDestination !== null;
+                let isPawnMove = pieceBeingMoved.type === "P";
+
+                // Handle En Passant capture (remove the captured pawn from its actual location)
+                // This condition checks for a diagonal pawn move to an empty square, matching en passant target
+                if (isPawnMove && Math.abs(c - fromC) === 1 && !targetPieceAtDestination && enPassantTarget && r === enPassantTarget.row && c === enPassantTarget.col) {
+                    boardState[fromR][c] = null; // Remove the captured pawn
+                    isCapture = true; // It's a capture for 50-move rule
+                }
+
+                // Perform the actual move
+                boardState[r][c] = pieceBeingMoved;
+                boardState[fromR][fromC] = null;
+
+                // Handle Castling Rook movement for the actual board
+                if (pieceBeingMoved.type === "K" && Math.abs(c - fromC) === 2) {
+                    if (c === 6) { // Kingside castle
+                        boardState[r][5] = boardState[r][7]; // Move rook from h-file to f-file
+                        boardState[r][7] = null;
+                    } else if (c === 2) { // Queenside castle
+                        boardState[r][3] = boardState[r][0]; // Move rook from a-file to d-file
+                        boardState[r][0] = null;
+                    }
+                }
+
+                // Update castling rights for the actual game
+                if (pieceBeingMoved.type === "K") {
+                    castlingRights[pieceBeingMoved.color].K = false;
+                    castlingRights[pieceBeingMoved.color].Q = false;
+                } else if (pieceBeingMoved.type === "R") {
+                    if (fromC === 0) castlingRights[pieceBeingMoved.color].Q = false; // Left rook moved
+                    else if (fromC === 7) castlingRights[pieceBeingMoved.color].K = false; // Right rook moved
+                }
+
+                // Update enPassantTarget for the *next* turn
+                enPassantTarget = null; // Reset previous turn's target
+                if (pieceBeingMoved.type === "P" && Math.abs(r - fromR) === 2) { // If pawn moved two squares
+                    enPassantTarget = { row: (r + fromR) / 2, col: c };
+                }
+
+                // Update 50-move rule counter
+                if (isPawnMove || isCapture) {
+                    moveCountSinceLastCaptureOrPawnMove = 0;
+                } else {
+                    moveCountSinceLastCaptureOrPawnMove++;
+                }
+
+                selectedSquare.classList.remove("selected");
+                selectedSquare = null;
+
+                // Check for pawn promotion (Human side only)
+                if (pieceBeingMoved.type === "P" && ((r === 0 && pieceBeingMoved.color === "white") || (r === 7 && pieceBeingMoved.color === "black"))) {
+                    pendingPromotion = { r, c, color: pieceBeingMoved.color };
+                    showPromotionModal();
+                    renderBoard(); // Render board to show pawn at promotion square
+                    status.textContent = `Choose a piece to promote your pawn`;
+                    return; // Stop here, wait for promotion choice
+                }
+
+                currentTurn = oppositeColor(currentTurn); // Switch turn
+                renderBoard(); // Re-render board after move
+
+                checkGameEndConditions(); // Check for game over conditions
+
+                // If it's black's turn and game is not over, trigger bot move
+                if (currentTurn === "black" && !gameOver && !pendingPromotion) {
+                    setTimeout(botMove, 300); // Small delay for UX
+                }
+
+            } else { // Move was not legal
+                status.textContent = isInCheck(currentTurn) ? "Illegal move: King remains in check!" : "Illegal move!";
+                selectedSquare.classList.remove("selected");
+                selectedSquare = null;
+            }
+        } else { // No piece selected, attempting to select one
+            if (clickedPiece && clickedPiece.color === currentTurn) {
+                selectedSquare = e.target;
+                selectedSquare.classList.add("selected");
+                status.textContent = `Selected ${clickedPiece.color} ${clickedPiece.type}`;
+            } else if (clickedPiece && clickedPiece.color !== currentTurn) {
+                status.textContent = `It's ${capitalize(currentTurn)}'s turn.`;
+            } else {
+                status.textContent = "Select a piece to move.";
+            }
+        }
+    }
+
+    // --- Promotion Bar Logic ---
+    function showPromotionModal() {
+        promotionModal.style.display = "flex";
+        // Ensure the correct pieces are shown for promotion
+        promotionOptions.querySelectorAll(".promo-piece-btn").forEach(btn => {
+            const pieceType = btn.dataset.piece;
+            btn.textContent = pieces[pendingPromotion.color][pieceType];
+            btn.onclick = () => choosePromotionPiece(pieceType);
+        });
+    }
+
+    function choosePromotionPiece(pieceType) {
+        if (!pendingPromotion) return;
+
+        const { r, c, color } = pendingPromotion;
+        boardState[r][c] = { type: pieceType, color: color, moved: true }; // Promote the pawn
+
+        pendingPromotion = null;
+        promotionModal.style.display = "none";
+        currentTurn = oppositeColor(currentTurn); // Switch turn after promotion
+        renderBoard();
+        checkGameEndConditions();
+
+        if (currentTurn === "black" && !gameOver) {
+            setTimeout(botMove, 300);
+        }
+    }
+
+    // --- Undo/Redo Logic ---
+    undoBtn.addEventListener("click", () => {
+        if (undoStack.length === 0) return;
+
+        const currentState = {
+            board: cloneBoard(boardState),
+            castlingRights: JSON.parse(JSON.stringify(castlingRights)),
+            enPassantTarget: enPassantTarget ? { ...enPassantTarget } : null,
+            moveCountSinceLastCaptureOrPawnMove: moveCountSinceLastCaptureOrPawnMove,
+            currentTurn: currentTurn,
+            lastAIMove: lastAIMove ? { ...lastAIMove } : null
+        };
+        redoStack.push(currentState); // Push current state to redo stack
+
+        const prevState = undoStack.pop();
+        boardState = prevState.board;
+        castlingRights = prevState.castlingRights;
+        enPassantTarget = prevState.enPassantTarget;
+        moveCountSinceLastCaptureOrPawnMove = prevState.moveCountSinceLastCaptureOrPawnMove;
+        currentTurn = prevState.currentTurn;
+        lastAIMove = prevState.lastAIMove; // Restore last AI move
+
+        // Adjust position history for threefold repetition
+        if (positionHistory.length > 0) {
+            positionHistory.pop(); // Remove the current (undone) position
+            // If the undone move was an AI move, we might need to pop again for the human move
+            // This simplification might not perfectly handle all complex undo scenarios for 3-fold rep,
+            // but is generally sufficient for preventing immediate repetitive draws.
+            if (positionHistory.length > 0 && currentTurn === "white" && lastAIMove) { // If it was AI's move we just undid
+                 positionHistory.pop();
+            }
+        }
+
+        gameOver = false; // Game is no longer over if we undo
+        hideCheckmateModal();
+        hideDrawModal();
+        renderBoard();
+        updateUndoRedoButtons();
+        status.textContent = `Turn: ${capitalize(currentTurn)}`;
+    });
+
+    redoBtn.addEventListener("click", () => {
+        if (redoStack.length === 0) return;
+
+        // Save current state before redoing (to allow undoing the redo)
+        undoStack.push({
+            board: cloneBoard(boardState),
+            castlingRights: JSON.parse(JSON.stringify(castlingRights)),
+            enPassantTarget: enPassantTarget ? { ...enPassantTarget } : null,
+            moveCountSinceLastCaptureOrPawnMove: moveCountSinceLastCaptureOrPawnMove,
+            currentTurn: currentTurn,
+            lastAIMove: lastAIMove ? { ...lastAIMove } : null
+        });
+
+        const nextState = redoStack.pop();
+        boardState = nextState.board;
+        castlingRights = nextState.castlingRights;
+        enPassantTarget = nextState.enPassantTarget;
+        moveCountSinceLastCaptureOrPawnMove = nextState.moveCountSinceLastCaptureOrPawnMove;
+        currentTurn = nextState.currentTurn;
+        lastAIMove = nextState.lastAIMove; // Restore last AI move
+
+        // Add the re-done position back to history
+        positionHistory.push(JSON.stringify(boardState) + currentTurn + JSON.stringify(castlingRights) + (enPassantTarget ? JSON.stringify(enPassantTarget) : ""));
+
+        gameOver = false; // Game is no longer over if we redo a move (unless it ends right after)
+        hideCheckmateModal();
+        hideDrawModal();
+        renderBoard();
+        updateUndoRedoButtons();
+        checkGameEndConditions(); // Re-check game end conditions after redoing a move
+    });
+
+
+    // --- AI (Minimax) Logic ---
+
+    function evaluateBoard(board, color) {
+        let score = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = board[r][c];
+                if (piece) {
+                    let value = pieceValues[piece.type];
+                    // Add positional scores (simplified for now, can be expanded)
+                    // For example, pawns in center are better, knights on edge are worse etc.
+                    // This is a basic example, real engines have extensive tables.
+                    if (piece.type === 'P') {
+                        if (piece.color === 'white') {
+                            score += (7 - r) * 0.5; // Advance white pawns
+                        } else {
+                            score += r * 0.5; // Advance black pawns
+                        }
+                    }
+
+                    if (piece.color === color) {
+                        score += value;
+                    } else {
+                        score -= value;
+                    }
+                }
+            }
+        }
+
+        // Check if current player is in check (penalize if so)
+        if (isInCheck(color, board)) {
+            score -= 50; // Arbitrary penalty
+        }
+        // Check if opponent is in check (bonus if so)
+        if (isInCheck(oppositeColor(color), board)) {
+            score += 50; // Arbitrary bonus
+        }
+        return score;
+    }
+
+    // Minimax function
+    function minimax(gameState, depth, isMaximizingPlayer, alpha, beta, aiColor, lastMovePiece, lastMoveTarget) {
+        if (depth === 0 || gameOver) {
+            return evaluateBoard(gameState.board, aiColor);
+        }
+
+        const currentColor = isMaximizingPlayer ? aiColor : oppositeColor(aiColor);
+        const legalMoves = generateLegalMoves(currentColor, gameState.board, gameState.castlingRights, gameState.enPassantTarget);
+
+        if (legalMoves.length === 0) {
+            if (isInCheck(currentColor, gameState.board)) {
+                return isMaximizingPlayer ? -Infinity : Infinity; // Checkmate
+            }
+            return 0; // Stalemate
+        }
+
+        if (isMaximizingPlayer) {
+            let maxEval = -Infinity;
+            for (const move of legalMoves) {
+                const { fromR, fromC, toR, toC, promotionType } = move;
+                
+                // --- Repetition Prevention Logic (Added) ---
+                // If this move would immediately undo the opponent's last move with the same piece
+                if (lastMovePiece && lastMoveTarget &&
+                    fromR === lastMoveTarget.r && fromC === lastMoveTarget.c &&
+                    toR === lastMovePiece.r && toC === lastMovePiece.c &&
+                    gameState.board[fromR][fromC] && gameState.board[fromR][fromC].type === lastMovePiece.type
+                ) {
+                    // This move is a direct back-and-forth. Penalize it heavily unless it's the only move.
+                    if (legalMoves.length > 1) { // Only penalize if there are other options
+                         continue; // Skip this move in search for better ones
+                    }
+                }
+                // --- End Repetition Prevention ---
+
+
+                const newGameState = applyMoveToGameState(gameState.clone(), move);
+                const evaluation = minimax(newGameState, depth - 1, false, alpha, beta, aiColor,
+                                           { r: fromR, c: fromC, type: gameState.board[fromR][fromC].type }, { r: toR, c: toC });
+                maxEval = Math.max(maxEval, evaluation);
+                alpha = Math.max(alpha, evaluation);
+                if (beta <= alpha) break;
+            }
+            return maxEval;
+        } else {
+            let minEval = Infinity;
+            for (const move of legalMoves) {
+                const { fromR, fromC, toR, toC, promotionType } = move;
+
+                const newGameState = applyMoveToGameState(gameState.clone(), move);
+                const evaluation = minimax(newGameState, depth - 1, true, alpha, beta, aiColor,
+                                           { r: fromR, c: fromC, type: gameState.board[fromR][fromC].type }, { r: toR, c: toC });
+                minEval = Math.min(minEval, evaluation);
+                beta = Math.min(beta, evaluation);
+                if (beta <= alpha) break;
+            }
+            return minEval;
+        }
+    }
+
+
+    function generateLegalMoves(color, board, currentCastlingRights, currentEnPassantTarget) {
+        const moves = [];
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = board[r][c];
+                if (piece && piece.color === color) {
+                    for (let tr = 0; tr < 8; tr++) {
+                        for (let tc = 0; tc < 8; tc++) {
+                            // Check for regular moves
+                            if (isLegalMove(r, c, tr, tc, board, currentCastlingRights, currentEnPassantTarget)) {
+                                // Pawn promotion check
+                                if (piece.type === "P" && ((tr === 0 && color === "white") || (tr === 7 && color === "black"))) {
+                                    ["Q", "R", "B", "N"].forEach(promoType => {
+                                        moves.push({ fromR: r, fromC: c, toR: tr, toC: tc, promotionType: promoType });
+                                    });
+                                } else {
+                                    moves.push({ fromR: r, fromC: c, toR: tr, toC: tc });
+                                }
+                            }
+                            // Check for castling moves (they are special because isLegalMove handles them)
+                            if (piece.type === "K" && r === (color === "white" ? 7 : 0) && c === 4) {
+                                if (tc === 6 && tr === r && canCastle(color, "K", board, currentCastlingRights)) {
+                                    moves.push({ fromR: r, fromC: c, toR: tr, toC: tc, isCastling: true, castleSide: "K" });
+                                }
+                                if (tc === 2 && tr === r && canCastle(color, "Q", board, currentCastlingRights)) {
+                                    moves.push({ fromR: r, fromC: c, toR: tr, toC: tc, isCastling: true, castleSide: "Q" });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    // Applies a move to a GameState object and returns the new state
+    function applyMoveToGameState(gameState, move) {
+        const { fromR, fromC, toR, toC, promotionType, isCastling, castleSide } = move;
+        const board = gameState.board;
+        const castlingRights = gameState.castlingRights;
+        let enPassantTarget = null; // New en passant target for the next turn
+
+        const pieceBeingMoved = board[fromR][fromC];
+        const targetPieceAtDestination = board[toR][toC];
+        let isCapture = targetPieceAtDestination !== null;
+        let isPawnMove = pieceBeingMoved.type === "P";
+
+        // Handle En Passant capture
+        if (isPawnMove && Math.abs(toC - fromC) === 1 && !targetPieceAtDestination && gameState.enPassantTarget && toR === gameState.enPassantTarget.row && toC === gameState.enPassantTarget.col) {
+            board[fromR][toC] = null; // Remove the captured pawn
+            isCapture = true;
+        }
+
+        // Perform the move
+        board[toR][toC] = pieceBeingMoved;
+        board[fromR][fromC] = null;
+
+        // Handle Castling Rook movement
+        if (isCastling) {
+            if (castleSide === "K") { // Kingside castle
+                board[toR][5] = board[toR][7]; // Move rook from h-file to f-file
+                board[toR][7] = null;
+            } else if (castleSide === "Q") { // Queenside castle
+                board[toR][3] = board[toR][0]; // Move rook from a-file to d-file
+                board[toR][0] = null;
+            }
+        }
+
+        // Handle Pawn Promotion
+        if (promotionType) {
+            board[toR][toC] = { type: promotionType, color: pieceBeingMoved.color, moved: true };
+        }
+
+        // Update castling rights
+        if (pieceBeingMoved.type === "K") {
+            castlingRights[pieceBeingMoved.color].K = false;
+            castlingRights[pieceBeingMoved.color].Q = false;
+        } else if (pieceBeingMoved.type === "R") {
+            if (fromR === 0 && fromC === 0) castlingRights.black.Q = false;
+            if (fromR === 0 && fromC === 7) castlingRights.black.K = false;
+            if (fromR === 7 && fromC === 0) castlingRights.white.Q = false;
+            if (fromR === 7 && fromC === 7) castlingRights.white.K = false;
+        }
+        // If a rook is captured, the opponent loses that castling right
+        if (targetPieceAtDestination && targetPieceAtDestination.type === "R") {
+            if (toR === 0 && toC === 0) castlingRights.black.Q = false;
+            if (toR === 0 && toC === 7) castlingRights.black.K = false;
+            if (toR === 7 && toC === 0) castlingRights.white.Q = false;
+            if (toR === 7 && toC === 7) castlingRights.white.K = false;
+        }
+
+
+        // Set new en passant target if a pawn moved two squares
+        if (isPawnMove && Math.abs(toR - fromR) === 2) {
+            enPassantTarget = { row: (toR + fromR) / 2, col: toC };
+        }
+
+        // Update 50-move rule counter
+        if (isPawnMove || isCapture) {
+            gameState.moveCountSinceLastCaptureOrPawnMove = 0;
+        } else {
+            gameState.moveCountSinceLastCaptureOrPawnMove++;
+        }
+
+        gameState.enPassantTarget = enPassantTarget; // Update the state's en passant target
+        return gameState;
+    }
+
+
+    // AI's move logic
+    async function botMove() {
+        if (gameOver) return;
+
+        status.textContent = "AI is thinking...";
+
+        let bestMove = null;
+        let bestValue = -Infinity;
+        const aiColor = "black";
+
+        // --- Opening Book Phase ---
+        if (openingMoveIndex < openingMoves.length) {
+            const [fromNotation, toNotation] = openingMoves[openingMoveIndex];
+            const from = convertNotationToIndices(fromNotation);
+            const to = convertNotationToIndices(toNotation);
+
+            if (isLegalMove(from.r, from.c, to.r, to.c)) {
+                bestMove = { fromR: from.r, fromC: from.c, toR: to.r, toC: to.c };
+                openingMoveIndex++;
+                console.log(`AI playing opening move: ${fromNotation} to ${toNotation}`);
+            } else {
+                // Fallback to Minimax if opening move is somehow illegal (e.g., due to capture)
+                console.warn(`Opening move ${fromNotation}-${toNotation} is not legal. Falling back to Minimax.`);
+                currentOpening = null; // Exit opening book
+            }
+        }
+        // --- End Opening Book Phase ---
+
+        if (!bestMove) { // If no opening move or opening finished, use Minimax
+            const legalMoves = generateLegalMoves(aiColor, boardState, castlingRights, enPassantTarget);
+            // Shuffle moves to add some variety and prevent predictable play patterns,
+            // especially when multiple moves have the same evaluation.
+            shuffleArray(legalMoves);
+
+            for (const move of legalMoves) {
+                const { fromR, fromC, toR, toC } = move;
+                const piece = boardState[fromR][fromC];
+
+                // --- AI Repetition Prevention (Modified) ---
+                // Prioritize moves that are not immediate back-and-forth
+                if (lastAIMove &&
+                    lastAIMove.toR === fromR && lastAIMove.toC === fromC && // AI's previous target is this move's source
+                    lastAIMove.fromR === toR && lastAIMove.fromC === toC && // AI's previous source is this move's target
+                    lastAIMove.pieceType === piece.type // It's the same piece type
+                ) {
+                    if (legalMoves.length > 1) { // If there are other options, strongly penalize this
+                        console.log(`AI avoiding immediate back-and-forth with ${piece.type} from ${convertIndicesToNotation(fromR, fromC)} to ${convertIndicesToNotation(toR, toC)}`);
+                        // Give it a very low score so it's only chosen if there's no other option
+                        // Or, even better, if there are multiple moves with the same score, choose one that's not a repetition.
+                        // For simplicity in this example, we'll try to find a non-repetitive move first.
+                        // We will not 'continue' but let it be evaluated normally and handle preference later.
+                    }
+                }
+                // --- End AI Repetition Prevention ---
+
+
+                const newGameState = applyMoveToGameState(
+                    new GameState(boardState, castlingRights, enPassantTarget, moveCountSinceLastCaptureOrPawnMove),
+                    move
+                );
+
+                const value = minimax(newGameState, AI_DEPTH - 1, false, -Infinity, Infinity, aiColor,
+                                      { r: fromR, c: fromC, type: piece.type }, { r: toR, c: toC });
+
+                if (value > bestValue) {
+                    bestValue = value;
+                    bestMove = move;
+                }
+            }
+        }
+
+        if (bestMove) {
+            saveState(); // Save state before AI makes its move
+            const { fromR, fromC, toR, toC, promotionType, isCastling, castleSide } = bestMove;
+            const pieceBeingMoved = boardState[fromR][fromC];
+            const targetPieceAtDestination = boardState[toR][toC];
+            let isCapture = targetPieceAtDestination !== null;
+            let isPawnMove = pieceBeingMoved.type === "P";
+
+            // Update lastAIMove before applying the move
+            lastAIMove = { fromR, fromC, toR, toC, pieceType: pieceBeingMoved.type, pieceColor: pieceBeingMoved.color };
+
+            // Handle En Passant capture (remove the captured pawn from its actual location)
+            if (isPawnMove && Math.abs(toC - fromC) === 1 && !targetPieceAtDestination && enPassantTarget && toR === enPassantTarget.row && toC === enPassantTarget.col) {
+                boardState[fromR][toC] = null; // Remove the captured pawn
+                isCapture = true;
+            }
+
+            // Perform the actual move
+            boardState[toR][toC] = pieceBeingMoved;
+            boardState[fromR][fromC] = null;
+
+            // Handle Castling Rook movement
+            if (isCastling) {
+                if (castleSide === "K") { // Kingside castle
+                    boardState[toR][5] = boardState[toR][7];
+                    boardState[toR][7] = null;
+                } else if (castleSide === "Q") { // Queenside castle
+                    boardState[toR][3] = boardState[toR][0];
+                    boardState[toR][0] = null;
+                }
+            }
+
+            // Handle Pawn Promotion (AI always promotes to Queen)
+            if (pieceBeingMoved.type === "P" && ((toR === 0 && pieceBeingMoved.color === "black") || (toR === 7 && pieceBeingMoved.color === "white"))) {
+                boardState[toR][toC] = { type: "Q", color: pieceBeingMoved.color, moved: true };
+            }
+
+            // Update castling rights for the actual game
+            if (pieceBeingMoved.type === "K") {
+                castlingRights[pieceBeingMoved.color].K = false;
+                castlingRights[pieceBeingMoved.color].Q = false;
+            } else if (pieceBeingMoved.type === "R") {
+                if (fromR === 0 && fromC === 0) castlingRights.black.Q = false;
+                if (fromR === 0 && fromC === 7) castlingRights.black.K = false;
+                if (fromR === 7 && fromC === 0) castlingRights.white.Q = false;
+                if (fromR === 7 && fromC === 7) castlingRights.white.K = false;
+            }
+            // If a rook is captured, the opponent loses that castling right
+            if (targetPieceAtDestination && targetPieceAtDestination.type === "R") {
+                if (toR === 0 && toC === 0) castlingRights.black.Q = false;
+                if (toR === 0 && toC === 7) castlingRights.black.K = false;
+                if (toR === 7 && toC === 0) castlingRights.white.Q = false;
+                if (toR === 7 && toC === 7) castlingRights.white.K = false;
+            }
+
+            // Update enPassantTarget for the *next* turn
+            enPassantTarget = null; // Reset previous turn's target
+            if (isPawnMove && Math.abs(toR - fromR) === 2) { // If pawn moved two squares
+                enPassantTarget = { row: (toR + fromR) / 2, col: toC };
+            }
+
+            // Update 50-move rule counter
+            if (isPawnMove || isCapture) {
+                moveCountSinceLastCaptureOrPawnMove = 0;
+            } else {
+                moveCountSinceLastCaptureOrPawnMove++;
+            }
+
+            currentTurn = oppositeColor(currentTurn); // Switch turn back to human
+            renderBoard();
+            checkGameEndConditions();
+        } else {
+            console.warn("AI found no legal moves or is in an unexpected state. Declaring draw.");
+            showDrawBanner("AI cannot find a legal move.");
+        }
+    }
+
+    // Fisher-Yates (Knuth) Shuffle for array randomization
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+
+    // --- Game Initialization ---
+
+    function initializeBoard() {
+        boardState = Array(8).fill(null).map(() => Array(8).fill(null));
+
+        // Pawns
+        for (let c = 0; c < 8; c++) {
+            boardState[1][c] = { type: "P", color: "black", moved: false };
+            boardState[6][c] = { type: "P", color: "white", moved: false };
+        }
+
+        // Rooks
+        boardState[0][0] = { type: "R", color: "black", moved: false };
+        boardState[0][7] = { type: "R", color: "black", moved: false };
+        boardState[7][0] = { type: "R", color: "white", moved: false };
+        boardState[7][7] = { type: "R", color: "white", moved: false };
+
+        // Knights
+        boardState[0][1] = { type: "N", color: "black", moved: false };
+        boardState[0][6] = { type: "N", color: "black", moved: false };
+        boardState[7][1] = { type: "N", color: "white", moved: false };
+        boardState[7][6] = { type: "N", color: "white", moved: false };
+
+        // Bishops
+        boardState[0][2] = { type: "B", color: "black", moved: false };
+        boardState[0][5] = { type: "B", color: "black", moved: false };
+        boardState[7][2] = { type: "B", color: "white", moved: false };
+        boardState[7][5] = { type: "B", color: "white", moved: false };
+
+        // Queens
+        boardState[0][3] = { type: "Q", color: "black", moved: false };
+        boardState[7][3] = { type: "Q", color: "white", moved: false };
+
+        // Kings
+        boardState[0][4] = { type: "K", color: "black", moved: false };
+        boardState[7][4] = { type: "K", color: "white", moved: false };
+
+        // Reset game state variables
+        currentTurn = "white";
+        gameOver = false;
+        selectedSquare = null;
+        castlingRights = {
+            white: { K: true, Q: true },
+            black: { K: true, Q: true }
+        };
+        enPassantTarget = null;
+        moveCountSinceLastCaptureOrPawnMove = 0;
+        undoStack = [];
+        redoStack = [];
+        positionHistory = [];
+        lastAIMove = null; // Reset last AI move on new game
+
+        // Randomly select an opening for the AI
+        const openingNames = Object.keys(openings);
+        currentOpening = openingNames[Math.floor(Math.random() * openingNames.length)];
+        openingMoves = openings[currentOpening];
+        openingMoveIndex = 0;
+        openingDisplay.textContent = `AI is playing: ${currentOpening}`;
+
+        renderBoard();
+        updateUndoRedoButtons();
+    }
+
+    // Event listeners for modals and play again buttons
+    playAgainBtnCheckmate.addEventListener("click", () => {
+        hideCheckmateModal();
+        initializeBoard();
+    });
+
+    playAgainBtnDraw.addEventListener("click", () => {
+        hideDrawModal();
+        initializeBoard();
+    });
+
+    // Initial setup
+    initializeBoard();
+</script>
+</body>
+</html>
