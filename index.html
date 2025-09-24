@@ -5,38 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Homescreen</title>
     <style>
-        body{
+        body {
             background-color: black;
-        }
-        h1{
+            margin: 0;
+            padding: 0;
             font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+        }
+
+        h1 {
             text-align: center;
-            font-size: 50px;
+            font-size: 4vw; /* يتغير حسب حجم الشاشة */
             color: #ffc000;
+            margin-top: 20px;
         }
-        .bot{
-            margin-left: 150px;
-        }
-        div{
-            margin-left: 230px;
-        }
-        img:hover{
-            width: 460px;
-        }
-        h2{
-            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+
+        h2 {
             text-align: center;
             color: white;
+            font-size: 2vw;
+            margin-bottom: 20px;
+        }
+
+        .game-options {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 0 10px;
+        }
+
+        .game-options a img {
+            width: 45vw; /* يتغير حسب حجم الشاشة */
+            max-width: 450px;
+            transition: transform 0.3s ease;
+        }
+
+        .game-options a img:hover {
+            transform: scale(1.05);
+        }
+
+        /* تحسين العرض على الشاشات الصغيرة */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 8vw;
+            }
+            h2 {
+                font-size: 4vw;
+            }
+            .game-options a img {
+                width: 80vw;
+            }
         }
     </style>
 </head>
 <body>
     <h1>Chess Home Screen</h1>
     <h2>Choose To Play</h2>
-    <br>
-    <div>
-        <a href="chess.html"><img src="1v1.png" alt="" width="450"></a>
-        <a href="htmlbot.html"><img src="bot.png" alt="" width="450" class="bot"></a>
+    <div class="game-options">
+        <a href="chess.html"><img src="1v1.png" alt="1v1 Game"></a>
+        <a href="htmlbot.html"><img src="bot.png" alt="Bot Game"></a>
     </div>
 </body>
 </html>
